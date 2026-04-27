@@ -88,10 +88,10 @@ export default function ToolsPage() {
         }),
       })
       const data = await res.json()
-      if (!res.ok) { toast.error(data.error ?? 'Extraction failed'); return }
+      if (!res.ok) { toast.error(data.error ?? 'Extraction failed', { duration: 8000 }); return }
       setExtracted(data)
       toast.success('Extracted! Review and publish.')
-    } catch { toast.error('Something went wrong') }
+    } catch (e: any) { toast.error(e?.message ?? 'Network error', { duration: 8000 }) }
     finally { setExtracting(false) }
   }
 

@@ -54,14 +54,22 @@ export async function POST(req: NextRequest) {
 
   content.push({ type: 'text', text: text?.trim() || 'Extract all scholarship details from this image.' })
 
-  const message = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 1024,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content }],
-  })
+  try {
+    const message = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content }],
+    })
 
-  const raw = message.content.filter((b) => b.type === 'text').map((b) => (b as Anthropic.TextBlock).text).join('')
-  const clean = raw.trim().replace(/^```json?\s*/i, '').replace(/```\s*$/i, '').trim()
-  return NextResponse.json(JSON.parse(clean))
+    const raw = message.content.filter((b) => b.type === 'text').map((b) => (b as Anthropic.TextBlock).text).join('')
+    const clean = raw.trim().replace(/^```json?\s*/i, '').replace(/```\s*$/i, '').trim()
+    return NextResponse.json(JSON.parse(clean))
+  } catch (err: any) {
+    console.error('Extract error:', err)
+    return NextResponse.json(
+      { error: err?.message ?? err?.error?.message ?? 'Extraction failed — check Vercel logs' },
+      { status: 500 }
+    )
+  }
 }
