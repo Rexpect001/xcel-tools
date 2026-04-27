@@ -68,15 +68,16 @@ async function tryGemini(text?: string, image?: { data: string; mediaType: strin
   }
   parts.push({ text: text?.trim() || 'Extract all scholarship details from this image.' })
 
+  // Prepend system prompt as first user turn since v1beta systemInstruction can be finicky
+  const allParts = [{ text: SYSTEM_PROMPT }, ...parts]
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents: [{ role: 'user', parts }],
-        generationConfig: { maxOutputTokens: 1024, temperature: 0.1, responseMimeType: 'application/json' },
+        contents: [{ role: 'user', parts: allParts }],
+        generationConfig: { maxOutputTokens: 1024, temperature: 0.1 },
       }),
     }
   )
