@@ -14,7 +14,7 @@ Extract all relevant details and return ONLY a valid JSON object with exactly th
   "programLevel": ["array from: Undergraduate, Masters, PhD, Postdoctoral, Professional, Any"],
   "deadline": "YYYY-MM-DD format string, or null if not found",
   "eligibility": "who can apply — nationalities, GPA, degree requirements, etc.",
-  "description": "concise overview of what the scholarship covers and its purpose",
+  "description": "detailed 3-5 sentence overview: what the scholarship covers, its purpose, what makes it valuable, and any notable benefits or unique aspects",
   "applicationLink": "direct application URL if found, else empty string",
   "requiredDocs": ["array of required document names, e.g. CV, SOP, Transcripts, References, Research Proposal"],
   "fieldTags": ["array of relevant subject tags, e.g. Engineering, Medicine, Law"]
