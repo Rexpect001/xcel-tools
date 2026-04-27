@@ -22,11 +22,18 @@ Extract all relevant details and return ONLY a valid JSON object with exactly th
 Return ONLY the JSON object with no markdown, no explanation, no code fences.`
 
 export async function POST(req: NextRequest) {
-  const { text, image, password } = await req.json()
+  const { text, image, password, authCheck } = await req.json()
 
-  if (password !== process.env.TOOLS_PASSWORD) {
+  const storedPassword = process.env.TOOLS_PASSWORD
+  if (!storedPassword || password !== storedPassword) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  // Auth-only ping — just verify password, no extraction needed
+  if (authCheck) {
+    return NextResponse.json({ ok: true })
+  }
+
   if (!text?.trim() && !image?.data) {
     return NextResponse.json({ error: 'Provide text or an image' }, { status: 400 })
   }

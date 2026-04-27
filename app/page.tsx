@@ -59,7 +59,7 @@ export default function ToolsPage() {
     const res = await fetch('/api/extract', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password, text: 'ping' }),
+      body: JSON.stringify({ password, authCheck: true }),
     })
     setAuthLoading(false)
     if (res.status === 401) { toast.error('Wrong password'); return }
