@@ -105,7 +105,7 @@ export default function ToolsPage() {
         body: JSON.stringify({ password, ...extracted }),
       })
       const data = await res.json()
-      if (!res.ok) { toast.error(data.error ?? 'Publish failed'); return }
+      if (!res.ok) { toast.error(data.error ?? `Publish failed (${res.status})`, { duration: 10000 }); return }
       setPublished(true)
       toast.success(`Published: "${data.title}"`)
     } catch { toast.error('Publish failed') }
