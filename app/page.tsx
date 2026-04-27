@@ -237,7 +237,7 @@ export default function ToolsPage() {
             className="flex items-center gap-2 bg-gray-800 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-700 transition-colors">
             <RotateCcw size={14} /> Post Another
           </button>
-          <a href="https://xcel360.com/opportunities" target="_blank" rel="noopener noreferrer"
+          <a href="https://thexcel360.com/opportunities" target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-2 bg-violet-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-violet-500 transition-colors">
             <ExternalLink size={14} /> View Live
           </a>
