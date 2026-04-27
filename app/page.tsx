@@ -91,7 +91,7 @@ export default function ToolsPage() {
       if (!res.ok) { toast.error(data.error ?? 'Extraction failed', { duration: 8000 }); return }
       setExtracted(data)
       toast.success('Extracted! Review and publish.')
-    } catch (e: any) { toast.error(e?.message ?? 'Network error', { duration: 8000 }) }
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Network error', { duration: 8000 }) }
     finally { setExtracting(false) }
   }
 

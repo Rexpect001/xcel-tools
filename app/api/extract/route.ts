@@ -141,8 +141,8 @@ export async function POST(req: NextRequest) {
       const { result, provider: name } = await provider()
       console.log(`✓ Extracted via ${name}`)
       return NextResponse.json(result)
-    } catch (err: any) {
-      const msg = err?.message ?? String(err)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
       console.warn(`Provider failed: ${msg}`)
       errors.push(msg)
     }
