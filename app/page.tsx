@@ -204,9 +204,9 @@ export default function ToolsPage() {
       const data = await res.json()
       toast.dismiss(tid)
       if (data.response?.ok) {
-        toast.success(`Connected! URL: ${data.url}`, { duration: 8000 })
+        toast.success(`Connected! → ${data.url}`, { duration: 8000 })
       } else {
-        toast.error(`Failed (${data.status ?? 'network error'}): ${JSON.stringify(data.response ?? data.error)}`, { duration: 10000 })
+        toast.error(`Failed → ${data.url}\n${data.status ? `HTTP ${data.status}` : data.error}`, { duration: 12000 })
       }
     } catch {
       toast.dismiss(tid)
