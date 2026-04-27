@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import {
   Lock, Sparkles, X, Send, RotateCcw,
   ImageIcon, FileText, CheckCircle2, Loader2, ExternalLink,
-  GraduationCap, Briefcase, Building2,
+  GraduationCap, Briefcase, Building2, Wifi,
 } from 'lucide-react'
 
 type PostType = 'SCHOLARSHIP' | 'JOB' | 'INTERNSHIP'
@@ -193,6 +193,27 @@ export default function ToolsPage() {
     </div>
   )
 
+  async function testConnection() {
+    const tid = toast.loading('Testing connection to Xcel360…')
+    try {
+      const res = await fetch('/api/ping', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+      const data = await res.json()
+      toast.dismiss(tid)
+      if (data.response?.ok) {
+        toast.success(`Connected! URL: ${data.url}`, { duration: 8000 })
+      } else {
+        toast.error(`Failed (${data.status ?? 'network error'}): ${JSON.stringify(data.response ?? data.error)}`, { duration: 10000 })
+      }
+    } catch {
+      toast.dismiss(tid)
+      toast.error('Connection test failed')
+    }
+  }
+
   /* ── Type selection screen ── */
   if (!postType) return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
@@ -218,6 +239,10 @@ export default function ToolsPage() {
             </button>
           ))}
         </div>
+        <button onClick={testConnection}
+          className="mt-6 w-full flex items-center justify-center gap-2 text-xs text-gray-600 hover:text-gray-400 transition-colors py-2">
+          <Wifi size={12} /> Test connection to Xcel360
+        </button>
       </div>
     </div>
   )
