@@ -21,24 +21,17 @@ Extract all relevant details and return ONLY a valid JSON object with exactly th
 }
 Return ONLY the JSON object with no markdown, no explanation, no code fences.`
 
-export async function POST(req: NextRequest) {
-  const { text, image, password, authCheck } = await req.json()
+function parseJSON(raw: string) {
+  const clean = raw.trim().replace(/^```json?\s*/i, '').replace(/```\s*$/i, '').trim()
+  return JSON.parse(clean)
+}
 
-  const storedPassword = process.env.TOOLS_PASSWORD
-  if (!storedPassword || password !== storedPassword) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+/* ── Provider 1: Claude (Anthropic) ── */
+async function tryAnthropic(text?: string, image?: { data: string; mediaType: string }) {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) throw new Error('No Anthropic key')
 
-  // Auth-only ping — just verify password, no extraction needed
-  if (authCheck) {
-    return NextResponse.json({ ok: true })
-  }
-
-  if (!text?.trim() && !image?.data) {
-    return NextResponse.json({ error: 'Provide text or an image' }, { status: 400 })
-  }
-
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const client = new Anthropic({ apiKey })
   const content: Anthropic.MessageParam['content'] = []
 
   if (image?.data) {
@@ -51,25 +44,112 @@ export async function POST(req: NextRequest) {
       },
     })
   }
-
   content.push({ type: 'text', text: text?.trim() || 'Extract all scholarship details from this image.' })
 
-  try {
-    const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content }],
-    })
+  const message = await client.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 1024,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: 'user', content }],
+  })
 
-    const raw = message.content.filter((b) => b.type === 'text').map((b) => (b as Anthropic.TextBlock).text).join('')
-    const clean = raw.trim().replace(/^```json?\s*/i, '').replace(/```\s*$/i, '').trim()
-    return NextResponse.json(JSON.parse(clean))
-  } catch (err: any) {
-    console.error('Extract error:', err)
-    return NextResponse.json(
-      { error: err?.message ?? err?.error?.message ?? 'Extraction failed — check Vercel logs' },
-      { status: 500 }
-    )
+  const raw = message.content.filter((b) => b.type === 'text').map((b) => (b as Anthropic.TextBlock).text).join('')
+  return { result: parseJSON(raw), provider: 'Claude' }
+}
+
+/* ── Provider 2: Gemini 1.5 Flash (Google — free tier) ── */
+async function tryGemini(text?: string, image?: { data: string; mediaType: string }) {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) throw new Error('No Gemini key')
+
+  const parts: object[] = []
+  if (image?.data) {
+    parts.push({ inlineData: { mimeType: image.mediaType || 'image/jpeg', data: image.data } })
   }
+  parts.push({ text: text?.trim() || 'Extract all scholarship details from this image.' })
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents: [{ role: 'user', parts }],
+        generationConfig: { maxOutputTokens: 1024, temperature: 0.1, responseMimeType: 'application/json' },
+      }),
+    }
+  )
+  if (!res.ok) throw new Error(`Gemini error ${res.status}: ${await res.text()}`)
+  const data = await res.json()
+  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text
+  if (!raw) throw new Error('Empty Gemini response')
+  return { result: parseJSON(raw), provider: 'Gemini' }
+}
+
+/* ── Provider 3: DeepSeek (free tier) ── */
+async function tryDeepSeek(text?: string) {
+  const apiKey = process.env.DEEPSEEK_API_KEY
+  if (!apiKey) throw new Error('No DeepSeek key')
+
+  const res = await fetch('https://api.deepseek.com/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      max_tokens: 1024,
+      temperature: 0.1,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: text?.trim() || 'No text provided.' },
+      ],
+    }),
+  })
+  if (!res.ok) throw new Error(`DeepSeek error ${res.status}: ${await res.text()}`)
+  const data = await res.json()
+  const raw = data.choices?.[0]?.message?.content
+  if (!raw) throw new Error('Empty DeepSeek response')
+  return { result: parseJSON(raw), provider: 'DeepSeek' }
+}
+
+/* ── Main handler ── */
+export async function POST(req: NextRequest) {
+  const { text, image, password, authCheck } = await req.json()
+
+  const storedPassword = process.env.TOOLS_PASSWORD
+  if (!storedPassword || password !== storedPassword) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  if (authCheck) return NextResponse.json({ ok: true })
+
+  if (!text?.trim() && !image?.data) {
+    return NextResponse.json({ error: 'Provide text or an image' }, { status: 400 })
+  }
+
+  const errors: string[] = []
+
+  // Try each provider in order — stop at first success
+  const providers = [
+    () => tryAnthropic(text, image),
+    () => tryGemini(text, image),
+    () => tryDeepSeek(text), // DeepSeek is text-only
+  ]
+
+  for (const provider of providers) {
+    try {
+      const { result, provider: name } = await provider()
+      console.log(`✓ Extracted via ${name}`)
+      return NextResponse.json(result)
+    } catch (err: any) {
+      const msg = err?.message ?? String(err)
+      console.warn(`Provider failed: ${msg}`)
+      errors.push(msg)
+    }
+  }
+
+  return NextResponse.json(
+    { error: `All providers failed. Errors: ${errors.join(' | ')}` },
+    { status: 500 }
+  )
 }
