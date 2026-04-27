@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   if (!xcel360Url) return NextResponse.json({ error: 'XCEL360_URL not set', url: null }, { status: 500 })
   if (!toolsSecret) return NextResponse.json({ error: 'TOOLS_SECRET not set' }, { status: 500 })
 
-  const target = `${xcel360Url}/api/tools/ping`
+  const target = `${xcel360Url}/api/tools/post-opportunity`
   try {
     const res = await fetch(target, {
       headers: { Authorization: `Bearer ${toolsSecret}` },
