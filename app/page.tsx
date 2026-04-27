@@ -5,18 +5,52 @@ import toast from 'react-hot-toast'
 import {
   Lock, Sparkles, X, Send, RotateCcw,
   ImageIcon, FileText, CheckCircle2, Loader2, ExternalLink,
+  GraduationCap, Briefcase, Building2,
 } from 'lucide-react'
 
+type PostType = 'SCHOLARSHIP' | 'JOB' | 'INTERNSHIP'
+
 interface Extracted {
-  title: string; hostOrg: string; country: string; fundingType: string
-  field: string; programLevel: string[]; deadline: string | null
-  eligibility: string; description: string; applicationLink: string
-  requiredDocs: string[]; fieldTags: string[]
+  postType: PostType
+  title: string; hostOrg: string; country: string
+  fundingType: string; field: string; programLevel: string[]
+  deadline: string | null; eligibility: string; description: string
+  applicationLink: string; requiredDocs: string[]; fieldTags: string[]
+  // job / internship extras
+  company: string; jobType: string; salary: string
+  remote: boolean; experienceLevel: string; skills: string[]
 }
+
+const POST_TYPES: { type: PostType; label: string; sub: string; icon: React.ReactNode; color: string }[] = [
+  {
+    type: 'SCHOLARSHIP',
+    label: 'Scholarship',
+    sub: 'Funding, grants, fellowships & academic awards',
+    icon: <GraduationCap size={28} />,
+    color: 'from-violet-600 to-blue-600',
+  },
+  {
+    type: 'JOB',
+    label: 'Job',
+    sub: 'Full-time, part-time & contract positions',
+    icon: <Briefcase size={28} />,
+    color: 'from-emerald-600 to-teal-600',
+  },
+  {
+    type: 'INTERNSHIP',
+    label: 'Internship',
+    sub: 'Paid & unpaid internship programmes',
+    icon: <Building2 size={28} />,
+    color: 'from-orange-500 to-amber-500',
+  },
+]
 
 const FUNDING_TYPES = ['Fully funded', 'Partial', 'Tuition only', 'Stipend only', 'Other']
 const FIELDS = ['STEM', 'Non-STEM', 'Arts', 'Business', 'Law', 'Medicine', 'Social Sciences', 'Humanities', 'General']
 const LEVELS = ['Undergraduate', 'Masters', 'PhD', 'Postdoctoral', 'Professional', 'Any']
+const JOB_TYPES = ['Full-time', 'Part-time', 'Contract', 'Freelance', 'Volunteer']
+const INTERNSHIP_TYPES = ['Full-time', 'Part-time', 'Paid', 'Unpaid', 'Hybrid']
+const EXP_LEVELS = ['Entry Level', 'Mid Level', 'Senior Level', 'Executive', 'Internship']
 
 function compressImage(file: File): Promise<{ data: string; mediaType: string; preview: string }> {
   return new Promise((resolve, reject) => {
@@ -45,6 +79,7 @@ export default function ToolsPage() {
   const [password, setPassword] = useState('')
   const [authed, setAuthed] = useState(false)
   const [authLoading, setAuthLoading] = useState(false)
+  const [postType, setPostType] = useState<PostType | null>(null)
   const [text, setText] = useState('')
   const [image, setImage] = useState<{ data: string; mediaType: string; preview: string } | null>(null)
   const [extracting, setExtracting] = useState(false)
@@ -83,7 +118,8 @@ export default function ToolsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          password, text: text || undefined,
+          password, postType,
+          text: text || undefined,
           image: image ? { data: image.data, mediaType: image.mediaType } : undefined,
         }),
       })
@@ -113,7 +149,7 @@ export default function ToolsPage() {
   }
 
   function reset() {
-    setText(''); setImage(null); setExtracted(null); setPublished(false)
+    setText(''); setImage(null); setExtracted(null); setPublished(false); setPostType(null)
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -121,14 +157,15 @@ export default function ToolsPage() {
     setExtracted((p) => p ? { ...p, [key]: val } : p)
   }
 
-  function toggleLevel(l: string) {
-    setExtracted((p) => p ? {
-      ...p,
-      programLevel: p.programLevel.includes(l)
-        ? p.programLevel.filter((x) => x !== l)
-        : [...p.programLevel, l]
-    } : p)
+  function toggleChip(key: 'programLevel' | 'skills', val: string) {
+    setExtracted((p) => {
+      if (!p) return p
+      const arr = p[key] as string[]
+      return { ...p, [key]: arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val] }
+    })
   }
+
+  const typeConfig = POST_TYPES.find((t) => t.type === postType)
 
   /* ── Lock screen ── */
   if (!authed) return (
@@ -152,6 +189,35 @@ export default function ToolsPage() {
             {authLoading ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />} Unlock
           </button>
         </form>
+      </div>
+    </div>
+  )
+
+  /* ── Type selection screen ── */
+  if (!postType) return (
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
+      <div className="w-full max-w-lg">
+        <div className="text-center mb-10">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-600 to-blue-600 flex items-center justify-center mx-auto mb-4">
+            <Sparkles size={20} className="text-white" />
+          </div>
+          <h1 className="text-2xl font-bold text-white">What are you posting?</h1>
+          <p className="text-gray-400 text-sm mt-2">Choose a type — Claude will extract the right fields automatically.</p>
+        </div>
+        <div className="space-y-3">
+          {POST_TYPES.map(({ type, label, sub, icon, color }) => (
+            <button key={type} onClick={() => setPostType(type)}
+              className="w-full flex items-center gap-5 bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-600 rounded-2xl px-6 py-5 text-left transition-all group">
+              <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center text-white shrink-0 group-hover:scale-105 transition-transform`}>
+                {icon}
+              </div>
+              <div>
+                <p className="text-white font-semibold text-base">{label}</p>
+                <p className="text-gray-400 text-sm mt-0.5">{sub}</p>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -185,16 +251,16 @@ export default function ToolsPage() {
       {/* Header */}
       <div className="border-b border-gray-800 px-6 py-4 flex items-center justify-between sticky top-0 bg-gray-950 z-10">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-blue-600 flex items-center justify-center">
+          <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${typeConfig?.color ?? 'from-violet-600 to-blue-600'} flex items-center justify-center`}>
             <Sparkles size={14} className="text-white" />
           </div>
           <div>
             <p className="text-sm font-semibold">Xcel360 Tools</p>
-            <p className="text-xs text-gray-500">AI Scholarship Poster</p>
+            <p className="text-xs text-gray-500">{typeConfig?.label} Poster</p>
           </div>
         </div>
         <button onClick={reset} className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1.5 transition-colors">
-          <RotateCcw size={12} /> Reset
+          <RotateCcw size={12} /> Start Over
         </button>
       </div>
 
@@ -202,7 +268,7 @@ export default function ToolsPage() {
         {!extracted ? (
           /* ── Input stage ── */
           <div>
-            <h2 className="text-xl font-bold mb-1">AI Scholarship Extractor</h2>
+            <h2 className="text-xl font-bold mb-1">AI {typeConfig?.label} Extractor</h2>
             <p className="text-gray-400 text-sm mb-6">Upload a flyer, paste text, or both — Claude fills the form automatically.</p>
 
             <div className="grid md:grid-cols-2 gap-5 mb-5">
@@ -231,15 +297,15 @@ export default function ToolsPage() {
               <div>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Paste Text</p>
                 <textarea value={text} onChange={(e) => setText(e.target.value)} rows={9}
-                  placeholder="Paste scholarship announcement, email, or webpage text…"
+                  placeholder={`Paste ${typeConfig?.label.toLowerCase()} announcement, email, or webpage text…`}
                   className="w-full bg-gray-900 border border-gray-700 rounded-2xl px-4 py-3 text-sm text-white placeholder-gray-600 resize-none focus:outline-none focus:border-violet-500 h-48" />
               </div>
             </div>
 
             <button onClick={handleExtract} disabled={extracting || (!text.trim() && !image)}
-              className="w-full bg-gradient-to-r from-violet-600 to-blue-600 text-white rounded-xl py-3.5 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2">
+              className={`w-full bg-gradient-to-r ${typeConfig?.color ?? 'from-violet-600 to-blue-600'} text-white rounded-xl py-3.5 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2`}>
               {extracting
-                ? <><Loader2 size={16} className="animate-spin" /> Extracting with Claude…</>
+                ? <><Loader2 size={16} className="animate-spin" /> Extracting…</>
                 : <><Sparkles size={16} /> Extract & Fill Form</>}
             </button>
           </div>
@@ -257,9 +323,12 @@ export default function ToolsPage() {
             </div>
 
             <div className="grid md:grid-cols-2 gap-4 mb-4">
+              {/* Common fields */}
               {[
                 { label: 'Title *', key: 'title' as const },
-                { label: 'Host Organisation *', key: 'hostOrg' as const },
+                postType === 'SCHOLARSHIP'
+                  ? { label: 'Host Organisation *', key: 'hostOrg' as const }
+                  : { label: 'Company / Organisation *', key: 'company' as const },
                 { label: 'Country', key: 'country' as const },
                 { label: 'Application Link', key: 'applicationLink' as const },
               ].map(({ label, key }) => (
@@ -270,19 +339,14 @@ export default function ToolsPage() {
                     className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500" />
                 </div>
               ))}
+
               <div>
                 <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Deadline</label>
                 <input type="date" value={extracted.deadline ?? ''}
                   onChange={(e) => setField('deadline', e.target.value || null)}
                   className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500" />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Funding Type</label>
-                <select value={extracted.fundingType} onChange={(e) => setField('fundingType', e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500">
-                  {FUNDING_TYPES.map((f) => <option key={f}>{f}</option>)}
-                </select>
-              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Field</label>
                 <select value={extracted.field} onChange={(e) => setField('field', e.target.value)}
@@ -290,22 +354,81 @@ export default function ToolsPage() {
                   {FIELDS.map((f) => <option key={f}>{f}</option>)}
                 </select>
               </div>
+
+              {postType === 'SCHOLARSHIP' && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Funding Type</label>
+                  <select value={extracted.fundingType} onChange={(e) => setField('fundingType', e.target.value)}
+                    className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500">
+                    {FUNDING_TYPES.map((f) => <option key={f}>{f}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {postType !== 'SCHOLARSHIP' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                      {postType === 'JOB' ? 'Job Type' : 'Internship Type'}
+                    </label>
+                    <select value={extracted.jobType ?? ''} onChange={(e) => setField('jobType', e.target.value)}
+                      className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500">
+                      {(postType === 'JOB' ? JOB_TYPES : INTERNSHIP_TYPES).map((f) => <option key={f}>{f}</option>)}
+                    </select>
+                  </div>
+                  {postType === 'JOB' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Experience Level</label>
+                      <select value={extracted.experienceLevel ?? ''} onChange={(e) => setField('experienceLevel', e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500">
+                        {EXP_LEVELS.map((f) => <option key={f}>{f}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Salary / Stipend</label>
+                    <input value={extracted.salary ?? ''} onChange={(e) => setField('salary', e.target.value)}
+                      placeholder="e.g. $50,000–$70,000 / Unpaid"
+                      className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500 placeholder-gray-600" />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input type="checkbox" id="remote" checked={extracted.remote ?? false}
+                      onChange={(e) => setField('remote', e.target.checked)}
+                      className="w-4 h-4 rounded accent-violet-600" />
+                    <label htmlFor="remote" className="text-sm text-gray-300">Remote / Hybrid</label>
+                  </div>
+                </>
+              )}
             </div>
 
-            <div className="mb-4">
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Program Level</label>
-              <div className="flex flex-wrap gap-2">
-                {LEVELS.map((l) => (
-                  <button key={l} onClick={() => toggleLevel(l)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                      extracted.programLevel.includes(l)
-                        ? 'bg-violet-600 border-violet-500 text-white'
-                        : 'bg-gray-900 border-gray-700 text-gray-400 hover:border-gray-500'}`}>
-                    {l}
-                  </button>
-                ))}
+            {/* Program level (scholarship + internship) */}
+            {postType !== 'JOB' && (
+              <div className="mb-4">
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Program Level</label>
+                <div className="flex flex-wrap gap-2">
+                  {LEVELS.map((l) => (
+                    <button key={l} onClick={() => toggleChip('programLevel', l)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+                        extracted.programLevel?.includes(l)
+                          ? 'bg-violet-600 border-violet-500 text-white'
+                          : 'bg-gray-900 border-gray-700 text-gray-400 hover:border-gray-500'}`}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Skills (job + internship) */}
+            {postType !== 'SCHOLARSHIP' && (
+              <div className="mb-4">
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Skills</label>
+                <input value={(extracted.skills ?? []).join(', ')}
+                  onChange={(e) => setField('skills', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
+                  placeholder="e.g. Python, Project Management, Figma"
+                  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500 placeholder-gray-600" />
+              </div>
+            )}
 
             <div className="mb-4">
               <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Eligibility</label>
@@ -315,15 +438,15 @@ export default function ToolsPage() {
 
             <div className="mb-6">
               <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Description</label>
-              <textarea value={extracted.description} onChange={(e) => setField('description', e.target.value)} rows={3}
+              <textarea value={extracted.description} onChange={(e) => setField('description', e.target.value)} rows={4}
                 className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white resize-none focus:outline-none focus:border-violet-500" />
             </div>
 
-            <button onClick={handlePublish} disabled={publishing || !extracted.title || !extracted.hostOrg}
-              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl py-3.5 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2">
+            <button onClick={handlePublish} disabled={publishing || !extracted.title || (!extracted.hostOrg && !extracted.company)}
+              className={`w-full bg-gradient-to-r ${typeConfig?.color ?? 'from-green-600 to-emerald-600'} text-white rounded-xl py-3.5 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2`}>
               {publishing
                 ? <><Loader2 size={16} className="animate-spin" /> Publishing to Xcel360…</>
-                : <><Send size={16} /> Publish to Xcel360</>}
+                : <><Send size={16} /> Publish {typeConfig?.label} to Xcel360</>}
             </button>
           </div>
         )}

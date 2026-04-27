@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 
 export const dynamic = 'force-dynamic'
 
-const SYSTEM_PROMPT = `You are an assistant that extracts scholarship information from text or images (e.g. flyers, screenshots, social media posts).
+const SCHOLARSHIP_PROMPT = `You are an assistant that extracts scholarship information from text or images (e.g. flyers, screenshots, social media posts).
 Extract all relevant details and return ONLY a valid JSON object with exactly these fields:
 {
   "title": "full scholarship/program name",
@@ -21,13 +21,63 @@ Extract all relevant details and return ONLY a valid JSON object with exactly th
 }
 Return ONLY the JSON object with no markdown, no explanation, no code fences.`
 
+const JOB_PROMPT = `You are an assistant that extracts job listing information from text or images (e.g. flyers, screenshots, social media posts).
+Extract all relevant details and return ONLY a valid JSON object with exactly these fields:
+{
+  "title": "job title",
+  "company": "company or organisation name",
+  "hostOrg": "same as company",
+  "country": "country where the job is based (use 'Global' or 'Remote' if fully remote)",
+  "remote": true or false,
+  "jobType": "one of: Full-time, Part-time, Contract, Freelance, Volunteer",
+  "experienceLevel": "one of: Entry Level, Mid Level, Senior Level, Executive, Internship",
+  "salary": "salary range or compensation info, or empty string if not mentioned",
+  "field": "one of: STEM, Non-STEM, Arts, Business, Law, Medicine, Social Sciences, Humanities, General",
+  "skills": ["array of required skills or technologies, e.g. Python, Project Management, Figma"],
+  "deadline": "YYYY-MM-DD format string, or null if not found",
+  "eligibility": "requirements — years of experience, qualifications, nationality restrictions, etc.",
+  "description": "detailed 3-5 sentence overview: what the role involves, responsibilities, what makes it attractive, and team or company context",
+  "applicationLink": "direct application URL if found, else empty string",
+  "fieldTags": ["array of relevant tags, e.g. Software, Finance, Marketing"]
+}
+Return ONLY the JSON object with no markdown, no explanation, no code fences.`
+
+const INTERNSHIP_PROMPT = `You are an assistant that extracts internship listing information from text or images (e.g. flyers, screenshots, social media posts).
+Extract all relevant details and return ONLY a valid JSON object with exactly these fields:
+{
+  "title": "internship title or programme name",
+  "company": "company or organisation offering the internship",
+  "hostOrg": "same as company",
+  "country": "country where the internship is based (use 'Global' or 'Remote' if remote)",
+  "remote": true or false,
+  "jobType": "one of: Full-time, Part-time, Paid, Unpaid, Hybrid",
+  "experienceLevel": "Internship",
+  "salary": "stipend or pay info, or empty string if unpaid/not mentioned",
+  "field": "one of: STEM, Non-STEM, Arts, Business, Law, Medicine, Social Sciences, Humanities, General",
+  "programLevel": ["array from: Undergraduate, Masters, PhD, Any — who is eligible"],
+  "skills": ["array of desired skills, e.g. Excel, Communication, Research"],
+  "deadline": "YYYY-MM-DD format string, or null if not found",
+  "eligibility": "requirements — student status, GPA, nationality, year of study, etc.",
+  "description": "detailed 3-5 sentence overview: what the intern will do, learning outcomes, duration, and any notable perks or benefits",
+  "applicationLink": "direct application URL if found, else empty string",
+  "requiredDocs": ["array of required documents, e.g. CV, Cover Letter, Transcripts"],
+  "fieldTags": ["array of relevant tags, e.g. Engineering, Marketing, Research"]
+}
+Return ONLY the JSON object with no markdown, no explanation, no code fences.`
+
+function getPrompt(postType: string) {
+  if (postType === 'JOB') return JOB_PROMPT
+  if (postType === 'INTERNSHIP') return INTERNSHIP_PROMPT
+  return SCHOLARSHIP_PROMPT
+}
+
 function parseJSON(raw: string) {
   const clean = raw.trim().replace(/^```json?\s*/i, '').replace(/```\s*$/i, '').trim()
   return JSON.parse(clean)
 }
 
 /* ── Provider 1: Claude (Anthropic) ── */
-async function tryAnthropic(text?: string, image?: { data: string; mediaType: string }) {
+async function tryAnthropic(prompt: string, text?: string, image?: { data: string; mediaType: string }) {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('No Anthropic key')
 
@@ -44,12 +94,12 @@ async function tryAnthropic(text?: string, image?: { data: string; mediaType: st
       },
     })
   }
-  content.push({ type: 'text', text: text?.trim() || 'Extract all scholarship details from this image.' })
+  content.push({ type: 'text', text: text?.trim() || 'Extract all details from this image.' })
 
   const message = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 1024,
-    system: SYSTEM_PROMPT,
+    system: prompt,
     messages: [{ role: 'user', content }],
   })
 
@@ -58,25 +108,23 @@ async function tryAnthropic(text?: string, image?: { data: string; mediaType: st
 }
 
 /* ── Provider 2: Gemini 1.5 Flash (Google — free tier) ── */
-async function tryGemini(text?: string, image?: { data: string; mediaType: string }) {
+async function tryGemini(prompt: string, text?: string, image?: { data: string; mediaType: string }) {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error('No Gemini key')
 
-  const parts: object[] = []
+  const parts: object[] = [{ text: prompt }]
   if (image?.data) {
     parts.push({ inlineData: { mimeType: image.mediaType || 'image/jpeg', data: image.data } })
   }
-  parts.push({ text: text?.trim() || 'Extract all scholarship details from this image.' })
+  parts.push({ text: text?.trim() || 'Extract all details from this image.' })
 
-  // Prepend system prompt as first user turn since v1beta systemInstruction can be finicky
-  const allParts = [{ text: SYSTEM_PROMPT }, ...parts]
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ role: 'user', parts: allParts }],
+        contents: [{ role: 'user', parts }],
         generationConfig: { maxOutputTokens: 1024, temperature: 0.1 },
       }),
     }
@@ -88,8 +136,8 @@ async function tryGemini(text?: string, image?: { data: string; mediaType: strin
   return { result: parseJSON(raw), provider: 'Gemini' }
 }
 
-/* ── Provider 3: DeepSeek (free tier) ── */
-async function tryDeepSeek(text?: string) {
+/* ── Provider 3: DeepSeek (text-only) ── */
+async function tryDeepSeek(prompt: string, text?: string) {
   const apiKey = process.env.DEEPSEEK_API_KEY
   if (!apiKey) throw new Error('No DeepSeek key')
 
@@ -101,7 +149,7 @@ async function tryDeepSeek(text?: string) {
       max_tokens: 1024,
       temperature: 0.1,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: prompt },
         { role: 'user', content: text?.trim() || 'No text provided.' },
       ],
     }),
@@ -115,7 +163,7 @@ async function tryDeepSeek(text?: string) {
 
 /* ── Main handler ── */
 export async function POST(req: NextRequest) {
-  const { text, image, password, authCheck } = await req.json()
+  const { text, image, password, authCheck, postType } = await req.json()
 
   const storedPassword = process.env.TOOLS_PASSWORD
   if (!storedPassword || password !== storedPassword) {
@@ -128,20 +176,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Provide text or an image' }, { status: 400 })
   }
 
+  const prompt = getPrompt(postType ?? 'SCHOLARSHIP')
   const errors: string[] = []
 
-  // Try each provider in order — stop at first success
   const providers = [
-    () => tryAnthropic(text, image),
-    () => tryGemini(text, image),
-    () => tryDeepSeek(text), // DeepSeek is text-only
+    () => tryAnthropic(prompt, text, image),
+    () => tryGemini(prompt, text, image),
+    () => tryDeepSeek(prompt, text),
   ]
 
   for (const provider of providers) {
     try {
       const { result, provider: name } = await provider()
       console.log(`✓ Extracted via ${name}`)
-      return NextResponse.json(result)
+      return NextResponse.json({ ...result, postType: postType ?? 'SCHOLARSHIP' })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       console.warn(`Provider failed: ${msg}`)
