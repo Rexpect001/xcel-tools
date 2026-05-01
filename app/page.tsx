@@ -143,9 +143,13 @@ export default function ToolsPage() {
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error ?? `Publish failed (${res.status})`, { duration: 10000 }); return }
-      setPublishedId(data.id ?? null)
+      if (!data.id || !data.title) {
+        toast.error(`Unexpected response: ${JSON.stringify(data)}`, { duration: 15000 })
+        return
+      }
+      setPublishedId(data.id)
       setPublished(true)
-      toast.success(`Published: "${data.title}"`)
+      toast.success(`Published: "${data.title}"`, { duration: 6000 })
     } catch { toast.error('Publish failed') }
     finally { setPublishing(false) }
   }
