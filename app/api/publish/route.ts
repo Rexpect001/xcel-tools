@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isValidPassword } from '@/app/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   const { password, ...opportunity } = await req.json()
 
-  if (password !== process.env.TOOLS_PASSWORD) {
+  if (!isValidPassword(password)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

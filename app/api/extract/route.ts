@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { isValidPassword } from '@/app/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -165,8 +166,7 @@ async function tryDeepSeek(prompt: string, text?: string) {
 export async function POST(req: NextRequest) {
   const { text, image, password, authCheck, postType } = await req.json()
 
-  const storedPassword = process.env.TOOLS_PASSWORD
-  if (!storedPassword || password !== storedPassword) {
+  if (!isValidPassword(password)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
