@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import {
   Lock, Sparkles, X, Send, RotateCcw,
@@ -110,6 +110,23 @@ export default function ToolsPage() {
     try { setImage(await compressImage(file)) }
     catch { toast.error('Could not process image') }
   }
+
+  async function handleImageFile(file: File) {
+    if (!file.type.startsWith('image/')) { toast.error('Images only'); return }
+    try { setImage(await compressImage(file)); toast.success('Image pasted!') }
+    catch { toast.error('Could not process image') }
+  }
+
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const item = Array.from(e.clipboardData?.items ?? []).find(i => i.type.startsWith('image/'))
+      if (!item) return
+      const file = item.getAsFile()
+      if (file) handleImageFile(file)
+    }
+    document.addEventListener('paste', onPaste)
+    return () => document.removeEventListener('paste', onPaste)
+  }, [])
 
   async function handleExtract() {
     if (!text.trim() && !image) { toast.error('Add text or an image first'); return }
@@ -320,7 +337,7 @@ export default function ToolsPage() {
                   <button onClick={() => fileRef.current?.click()}
                     className="w-full h-48 rounded-2xl border-2 border-dashed border-gray-700 hover:border-violet-500 hover:bg-violet-500/5 transition-all flex flex-col items-center justify-center gap-2 text-gray-500 hover:text-violet-400">
                     <ImageIcon size={28} />
-                    <span className="text-sm font-medium">Click to upload flyer</span>
+                    <span className="text-sm font-medium">Click to upload or Ctrl+V to paste</span>
                     <span className="text-xs">JPG, PNG, WebP</span>
                   </button>
                 )}
