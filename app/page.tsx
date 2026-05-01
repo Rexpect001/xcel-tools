@@ -86,6 +86,7 @@ export default function ToolsPage() {
   const [extracted, setExtracted] = useState<Extracted | null>(null)
   const [publishing, setPublishing] = useState(false)
   const [published, setPublished] = useState(false)
+  const [publishedId, setPublishedId] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function handleAuth(e: React.FormEvent) {
@@ -142,6 +143,7 @@ export default function ToolsPage() {
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error ?? `Publish failed (${res.status})`, { duration: 10000 }); return }
+      setPublishedId(data.id ?? null)
       setPublished(true)
       toast.success(`Published: "${data.title}"`)
     } catch { toast.error('Publish failed') }
@@ -149,7 +151,7 @@ export default function ToolsPage() {
   }
 
   function reset() {
-    setText(''); setImage(null); setExtracted(null); setPublished(false); setPostType(null)
+    setText(''); setImage(null); setExtracted(null); setPublished(false); setPublishedId(null); setPostType(null)
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -262,7 +264,9 @@ export default function ToolsPage() {
             className="flex items-center gap-2 bg-gray-800 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-700 transition-colors">
             <RotateCcw size={14} /> Post Another
           </button>
-          <a href="https://thexcel360.com/opportunities" target="_blank" rel="noopener noreferrer"
+          <a
+            href={publishedId ? `https://thexcel360.com/opportunities/${publishedId}` : 'https://thexcel360.com/opportunities'}
+            target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-2 bg-violet-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-violet-500 transition-colors">
             <ExternalLink size={14} /> View Live
           </a>
